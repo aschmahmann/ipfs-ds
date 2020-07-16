@@ -3,31 +3,16 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/ipfs/go-datastore"
 	"github.com/multiformats/go-multibase"
 
-	"github.com/ipfs/go-ipfs/plugin"
-	"github.com/ipfs/go-ipfs/plugin/plugins/badgerds"
-	"github.com/ipfs/go-ipfs/plugin/plugins/flatfs"
-	"github.com/ipfs/go-ipfs/plugin/plugins/levelds"
+	"github.com/ipfs/go-ipfs/plugin/loader"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 
 	"github.com/urfave/cli/v2"
 )
-
-func init() {
-	badgerPlugin := badgerds.Plugins[0].(plugin.PluginDatastore)
-	flatfsPlugin := flatfs.Plugins[0].(plugin.PluginDatastore)
-	leveldsPlugin := levelds.Plugins[0].(plugin.PluginDatastore)
-	plugins := []plugin.PluginDatastore{badgerPlugin, flatfsPlugin, leveldsPlugin}
-
-	for _, pl := range plugins {
-		if err := fsrepo.AddDatastoreConfigHandler(pl.DatastoreTypeName(), pl.DatastoreConfigParser()); err != nil {
-			panic(err)
-		}
-	}
-}
 
 func main() {
 	var prefix, numeric bool
@@ -159,6 +144,25 @@ func main() {
 	}
 }
 
+func setupPlugins(externalPluginsPath string) error {
+	// Load any external plugins if available on externalPluginsPath
+	plugins, err := loader.NewPluginLoader(filepath.Join(externalPluginsPath, "plugins"))
+	if err != nil {
+		return fmt.Errorf("error loading plugins: %s", err)
+	}
+
+	// Load preloaded and external plugins
+	if err := plugins.Initialize(); err != nil {
+		return fmt.Errorf("error initializing plugins: %s", err)
+	}
+
+	if err := plugins.Inject(); err != nil {
+		return fmt.Errorf("error initializing plugins: %s", err)
+	}
+
+	return nil
+}
+
 func GetDatastore(ipfsPath string) (datastore.Datastore, error) {
 	var repoPath string
 	if len(ipfsPath) > 0 {
@@ -178,6 +182,10 @@ func GetDatastore(ipfsPath string) (datastore.Datastore, error) {
 
 	if repoLocked {
 		return nil, fmt.Errorf("ipfs daemon is running. please stop it to run this command")
+	}
+
+	if err := setupPlugins(repoPath); err != nil {
+		return nil, err
 	}
 
 	repo, err := fsrepo.Open(repoPath)
