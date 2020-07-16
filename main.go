@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/ipfs/go-ipfs/repo"
 	"os"
 	"path/filepath"
 
@@ -56,12 +57,13 @@ func main() {
 						return fmt.Errorf("incorrect number of arguments")
 					}
 
-					ds, err := GetDatastore(ipfsPath)
+					repo, err := GetRepo(ipfsPath)
 					if err != nil {
 						return err
 					}
+					defer repo.Close()
 
-					val, err := GetDatastoreValue(ds, c.Args().First(), valueBase, keyMultibase)
+					val, err := GetDatastoreValue(repo.Datastore(), c.Args().First(), valueBase, keyMultibase)
 					if err != nil {
 						return err
 					}
@@ -103,12 +105,13 @@ func main() {
 						return fmt.Errorf("incorrect number of arguments")
 					}
 
-					ds, err := GetDatastore(ipfsPath)
+					repo, err := GetRepo(ipfsPath)
 					if err != nil {
 						return err
 					}
+					defer repo.Close()
 
-					return SetDatastoreValue(ds, args.First(), args.Get(1), keyMultibase, valueMultibase)
+					return SetDatastoreValue(repo.Datastore(), args.First(), args.Get(1), keyMultibase, valueMultibase)
 				},
 			},
 			{
@@ -163,7 +166,7 @@ func setupPlugins(externalPluginsPath string) error {
 	return nil
 }
 
-func GetDatastore(ipfsPath string) (datastore.Datastore, error) {
+func GetRepo(ipfsPath string) (repo.Repo, error) {
 	var repoPath string
 	if len(ipfsPath) > 0 {
 		repoPath = ipfsPath
@@ -188,12 +191,7 @@ func GetDatastore(ipfsPath string) (datastore.Datastore, error) {
 		return nil, err
 	}
 
-	repo, err := fsrepo.Open(repoPath)
-	if err != nil {
-		return nil, err
-	}
-
-	return repo.Datastore(), nil
+	return fsrepo.Open(repoPath)
 }
 
 func GetDatastoreValue(ds datastore.Datastore, key, outputBase string, keyMultiBase bool) (string, error) {
