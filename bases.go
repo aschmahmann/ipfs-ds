@@ -40,8 +40,7 @@ func (s codeAndNameSorter) Len() int           { return len(s.data) }
 func (s codeAndNameSorter) Swap(i, j int)      { s.data[i], s.data[j] = s.data[j], s.data[i] }
 func (s codeAndNameSorter) Less(i, j int) bool { return s.data[i].Code < s.data[j].Code }
 
-
-func printBases(prefixes, numeric bool){
+func printBases(prefixes, numeric bool) {
 	// write to standard out
 	w := os.Stdout
 

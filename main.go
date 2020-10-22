@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/ipfs/go-ipfs/repo"
 	"os"
 	"path/filepath"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/multiformats/go-multibase"
 
 	"github.com/ipfs/go-ipfs/plugin/loader"
+	"github.com/ipfs/go-ipfs/repo"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 
 	"github.com/urfave/cli/v2"
@@ -25,8 +25,8 @@ func main() {
 		Name: "ipfs-ds",
 		Commands: []*cli.Command{
 			{
-				Name:    "get",
-				Usage:   "get a datastore value by key",
+				Name:  "get",
+				Usage: "get a datastore value by key",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Required:    false,
@@ -73,8 +73,8 @@ func main() {
 				},
 			},
 			{
-				Name:    "put",
-				Usage:   "put a datastore key-value pair",
+				Name:  "put",
+				Usage: "put a datastore key-value pair",
 				Flags: []cli.Flag{
 					&cli.BoolFlag{
 						Required:    false,
@@ -115,8 +115,8 @@ func main() {
 				},
 			},
 			{
-				Name:    "bases",
-				Usage:   "List available multibase encodings",
+				Name:  "bases",
+				Usage: "List available multibase encodings",
 				Flags: []cli.Flag{
 					&cli.BoolFlag{
 						Required:    false,
