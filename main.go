@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/ipfs/go-datastore"
+	"github.com/ipfs/go-datastore/query"
 	"github.com/multiformats/go-multibase"
 
 	"github.com/ipfs/go-ipfs/plugin/loader"
@@ -20,6 +21,7 @@ func main() {
 	var valueBase string
 	var keyMultibase, valueMultibase bool
 	var ipfsPath string
+	var searchLimit int
 
 	app := &cli.App{
 		Name: "ipfs-ds",
@@ -69,6 +71,61 @@ func main() {
 					}
 
 					fmt.Println(val)
+					return nil
+				},
+			},
+			{
+				Name:  "search",
+				Usage: "search a datastore for all keys that meet the conditions",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Required:    false,
+						Name:        "base",
+						Aliases:     []string{"b"},
+						Value:       "",
+						Usage:       "The multibase to encode the value with (e.g. base32)",
+						Destination: &valueBase,
+					},
+					&cli.PathFlag{
+						Required:    false,
+						Name:        "repo",
+						Value:       "",
+						Usage:       "The IPFS repo with the datastore config (uses the IPFS_PATH environment variable by default)",
+						Destination: &ipfsPath,
+					},
+					&cli.BoolFlag{
+						Required:    false,
+						Name:        "key-encoded",
+						Value:       false,
+						Usage:       "The key is encoded using multibase",
+						Destination: &keyMultibase,
+					},
+					&cli.IntFlag{
+						Required:    false,
+						Name:        "limit",
+						Value:       0,
+						Usage:       "The limit to the number of keys returned",
+						Destination: &searchLimit,
+					},
+				},
+				ArgsUsage: "<key>",
+				Action: func(c *cli.Context) error {
+					if c.NArg() != 1 {
+						return fmt.Errorf("incorrect number of arguments")
+					}
+
+					repo, err := GetRepo(ipfsPath)
+					if err != nil {
+						return err
+					}
+					defer repo.Close()
+
+					res, err := SearchDatastoreValue(repo.Datastore(), c.Args().First(), searchLimit, keyMultibase)
+					if err != nil {
+						return err
+					}
+
+					printQueryResults(res, valueBase)
 					return nil
 				},
 			},
@@ -194,6 +251,59 @@ func GetRepo(ipfsPath string) (repo.Repo, error) {
 	return fsrepo.Open(repoPath)
 }
 
+func SearchDatastoreValue(ds datastore.Datastore, key string, limit int, keyMultiBase bool) (<-chan query.Result, error) {
+	var err error
+
+	dsKeyStr := key
+	if keyMultiBase {
+		_, keyBytes, err := multibase.Decode(key)
+		if err != nil {
+			return nil, err
+		}
+		dsKeyStr = string(keyBytes)
+	}
+
+	res, err := ds.Query(query.Query{
+		Prefix:            dsKeyStr,
+		Filters:           nil,
+		Orders:            nil,
+		Limit:             limit,
+		Offset:            0,
+		KeysOnly:          true,
+		ReturnExpirations: true,
+		ReturnsSizes:      false,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Next(), nil
+}
+
+func printQueryResults(res <-chan query.Result, outputBase string) {
+	for r := range res {
+		keyStr, err := encodeWithBase([]byte(r.Key), outputBase)
+		if err != nil {
+			fmt.Printf("error encoding key %v with base %s \n", r.Key, outputBase)
+			continue
+		}
+		fmt.Printf("{Key : %s, Expiration: %s, Size: %d}\n", keyStr, r.Expiration, r.Size)
+	}
+}
+
+func encodeWithBase(val []byte, outputBase string) (string, error) {
+	if len(outputBase) == 0 {
+		return string(val), nil
+	}
+
+	outputBaseEnc, err := BaseEncoderFromString(outputBase)
+	if err != nil {
+		return "", nil
+	}
+	return outputBaseEnc.Encode(val), nil
+}
+
 func GetDatastoreValue(ds datastore.Datastore, key, outputBase string, keyMultiBase bool) (string, error) {
 	var err error
 
@@ -212,15 +322,7 @@ func GetDatastoreValue(ds datastore.Datastore, key, outputBase string, keyMultiB
 		return "", err
 	}
 
-	if len(outputBase) == 0 {
-		return string(val), nil
-	}
-
-	outputBaseEnc, err := BaseEncoderFromString(outputBase)
-	if err != nil {
-		return "", nil
-	}
-	return outputBaseEnc.Encode(val), nil
+	return encodeWithBase(val, outputBase)
 }
 
 func SetDatastoreValue(ds datastore.Datastore, key, value string, keyMultiBase, valueMultiBase bool) error {
