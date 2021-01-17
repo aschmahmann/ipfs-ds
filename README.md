@@ -6,6 +6,11 @@ Utility for working with the ipfs datastore
 Occasionally go-ipfs runs into issues where it might be useful for debugging or hotfixing purposes to directly
 modify the datastore. `ipfs-ds` is a tool to help you do this.
 
+## Installation
+
+Clone this repo and run `go build` in the directory to build the binary,
+or run `go install` to have the binary placed in your Go binary folder (e.g. `~/go/bin`).
+
 ## Examples
 
 `ipfs-ds get --base=base58btc /local/filesroot` will output the bytes corresponding to the MFS root as a base58btc
